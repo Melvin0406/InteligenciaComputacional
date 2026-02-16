@@ -1,0 +1,12 @@
+{
+  "name": "student-productivity-predictor",
+  "version": "1.0.0",
+  "description": "Inferencia de productividad estudiantil usando ONNX Runtime",
+  "main": "predict.js",
+  "scripts": {
+    "predict": "node predict.js"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.21.0"
+  }
+}
