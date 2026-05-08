@@ -78,3 +78,49 @@ app = FastAPI(title="Article Vector Store API", lifespan=lifespan)
 @app.get("/")
 def root():
     return {"status": "ok", "documents_indexed": len(state.originals)}
+
+
+# Modelos de request / response
+class ArticleCreate(BaseModel):
+    text: str
+    metadata: ArticleMetadata
+
+
+class ArticleCreateResponse(BaseModel):
+    id: str
+    chunks_created: int
+
+
+# Chunking
+CHUNK_SIZE = 400
+SPLIT_THRESHOLD = 500
+
+def split_text(text: str) -> list[str]:
+    if len(text) <= SPLIT_THRESHOLD:
+        return [text]
+    return [text[i:i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE)]
+
+
+# POST /documents
+@app.post("/documents", response_model=ArticleCreateResponse, status_code=201)
+def create_document(body: ArticleCreate):
+    doc_id = str(uuid.uuid4())
+
+    # Guardar el documento original completo
+    state.originals[doc_id] = {
+        "text": body.text,
+        "metadata": body.metadata.model_dump(),
+    }
+
+    # Generar chunks e indexarlos
+    chunks = split_text(body.text)
+    chunk_docs = []
+    for chunk_text in chunks:
+        chunk_id = str(uuid.uuid4())
+        chunk_metadata = {**body.metadata.model_dump(), "original_id": doc_id}
+        chunk_docs.append(Document(text=chunk_text, metadata=chunk_metadata))
+        state.chunk_to_original[chunk_id] = doc_id
+
+    state.fvs.add_documents(chunk_docs)
+
+    return ArticleCreateResponse(id=doc_id, chunks_created=len(chunks))
