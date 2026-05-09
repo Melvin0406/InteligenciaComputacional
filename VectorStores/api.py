@@ -124,3 +124,42 @@ def create_document(body: ArticleCreate):
     state.fvs.add_documents(chunk_docs)
 
     return ArticleCreateResponse(id=doc_id, chunks_created=len(chunks))
+
+
+# GET /documents/{id}
+@app.get("/documents/{doc_id}")
+def get_document(doc_id: str):
+    doc = state.originals.get(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"id": doc_id, "text": doc["text"], "metadata": doc["metadata"]}
+
+
+# POST /documents/search
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    metadata_filter: dict[str, str] | None = None
+
+
+class SearchResultResponse(BaseModel):
+    score: float
+    text: str
+    metadata: dict
+
+
+@app.post("/documents/search", response_model=list[SearchResultResponse])
+def search_documents(body: SearchRequest):
+    results = state.fvs.search(
+        query=body.query,
+        top_k=body.top_k,
+        metadata_filter=body.metadata_filter,
+    )
+    return [
+        SearchResultResponse(
+            score=round(r.score * 100, 2),
+            text=r.document.text,
+            metadata=r.document.metadata,
+        )
+        for r in results
+    ]
